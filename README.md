@@ -7,5 +7,6 @@ Inspiriert durch LouCipher --> https://github.com/Lou-Cipher/vpn-bypass-for-stre
   cd vpn-bypass
 3. chmod +x vpn-bypass.sh
 4. Ggf. Gateway IP setzen
-nano /opt/vpn-bypass.sh
-5. 
+  nano /opt/vpn-bypass.sh
+5. Script ausführen
+  ./vpn-bypass.sh
