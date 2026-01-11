@@ -1,49 +1,78 @@
 #!/bin/bash
 
-# Definiere die Datei, in der die IP-Adressen gespeichert werden
+set -e
+
+# Dateien
 IP_FILE="/opt/vpn_bypass_ips.txt"
 IP_FILE_PREVIOUS="/opt/vpn_bypass_ips_previous.txt"
+IP_FILE_CLEAN="/opt/vpn_bypass_ips_clean.txt"
 
-# Definiere das Gateway für eth0
-GATEWAY_ETH0="192.168.10.1"  # Passen Sie dies an Ihr tatsächliches Gateway an
+# GitHub Raw URL
+IP_URL="https://raw.githubusercontent.com/KevinGandalf/vpn-bypass/main/vpn_bypass_ips.txt"
 
-# 1. Lade die IP-Adressen von GitHub herunter
+# ------------------------------------------------------------
+# 1. Standard-Gateway und Device automatisch ermitteln
+# ------------------------------------------------------------
+DEFAULT_ROUTE=$(ip route show default | head -n 1)
+
+if [[ -z "$DEFAULT_ROUTE" ]]; then
+    echo "$(date) - ❌ Kein Default-Gateway gefunden!"
+    exit 1
+fi
+
+GATEWAY=$(echo "$DEFAULT_ROUTE" | awk '{for(i=1;i<=NF;i++) if ($i=="via") print $(i+1)}')
+DEVICE=$(echo "$DEFAULT_ROUTE" | awk '{for(i=1;i<=NF;i++) if ($i=="dev") print $(i+1)}')
+
+if [[ -z "$GATEWAY" || -z "$DEVICE" ]]; then
+    echo "$(date) - ❌ Gateway oder Device konnte nicht ermittelt werden!"
+    exit 1
+fi
+
+echo "$(date) - ✅ Default-Gateway: $GATEWAY"
+echo "$(date) - ✅ Default-Device : $DEVICE"
+
+# ------------------------------------------------------------
+# 2. IP-Liste herunterladen
+# ------------------------------------------------------------
 echo "$(date) - Lade IP-Adressen von GitHub herunter..."
-curl -s https://raw.githubusercontent.com/KevinGandalf/vpn-bypass/main/vpn_bypass_ips.txt -o $IP_FILE
+curl -fsSL "$IP_URL" -o "$IP_FILE"
 
-# 2. Vergleiche die neue Liste mit der vorherigen Liste
-#if [ -f $IP_FILE_PREVIOUS ]; then
-#    echo "$(date) - Vergleiche neue IP-Liste mit der alten..."
+if [[ ! -s "$IP_FILE" ]]; then
+    echo "$(date) - ❌ IP-Datei ist leer oder konnte nicht geladen werden!"
+    exit 1
+fi
 
-#    # Überprüfe, ob sich die Liste geändert hat, indem wir den Inhalt der Dateien vergleichen
-#    if cmp -s "$IP_FILE" "$IP_FILE_PREVIOUS"; then
-#        echo "$(date) - Keine Änderungen in der IP-Liste. Keine Routenänderungen erforderlich."
-#        exit 0
-#    else
-#        echo "$(date) - IP-Liste hat sich geändert, füge Routen hinzu..."
-#    fi
-#else
-#    echo "$(date) - Keine vorherige IP-Liste gefunden, füge alle Routen hinzu..."
-#fi
+# ------------------------------------------------------------
+# 3. IP-Liste bereinigen (Kommentare, Leerzeilen, Duplikate)
+# ------------------------------------------------------------
+echo "$(date) - Bereinige IP-Liste (Duplikate entfernen)..."
 
-# 3. Lade die IP-Adressen in ein Array
-mapfile -t ip_list < $IP_FILE
+grep -Ev '^\s*#|^\s*$' "$IP_FILE" \
+    | sort -u \
+    > "$IP_FILE_CLEAN"
 
-# 4. Füge neue Routen hinzu oder aktualisiere sie
+# ------------------------------------------------------------
+# 4. IP-Adressen einlesen
+# ------------------------------------------------------------
+mapfile -t ip_list < "$IP_FILE_CLEAN"
+
+# ------------------------------------------------------------
+# 5. Routen setzen
+# ------------------------------------------------------------
 for ip in "${ip_list[@]}"; do
-    ip_only=$(echo $ip | cut -d'/' -f1)
+    ip_only="${ip%%/*}"
 
-    # Überprüfen, ob die IP-Adresse bereits als Route existiert
-    if ! ip route show | grep -q "$ip_only"; then
-        echo "$(date) - Neue IP-Adresse $ip_only gefunden, füge Route hinzu"
-        sudo ip route add $ip_only via $GATEWAY_ETH0 dev eth0
-    else
+    if ip route show "$ip_only" &>/dev/null; then
         echo "$(date) - Route für $ip_only existiert bereits, überspringe"
+    else
+        echo "$(date) - Füge Route hinzu: $ip_only via $GATEWAY dev $DEVICE"
+        ip route add "$ip_only" via "$GATEWAY" dev "$DEVICE"
     fi
 done
 
-# 5. Speichere die aktuelle Liste als die vorherige Liste für den nächsten Vergleich
-echo "$(date) - Speichere die aktuelle IP-Liste für den nächsten Vergleich..."
-cp $IP_FILE $IP_FILE_PREVIOUS
+# ------------------------------------------------------------
+# 6. Aktuelle Liste sichern
+# ------------------------------------------------------------
+cp "$IP_FILE_CLEAN" "$IP_FILE_PREVIOUS"
 
-echo "$(date) - Abgleich abgeschlossen."
+echo "$(date) - ✅ Abgleich abgeschlossen."
