@@ -9,7 +9,7 @@ GATEWAY_ETH0="192.168.10.1"  # Passen Sie dies an Ihr tatsächliches Gateway an
 
 # 1. Lade die IP-Adressen von GitHub herunter
 echo "$(date) - Lade IP-Adressen von GitHub herunter..."
-curl -s https://lou.h0rst.us/vpn_bypass.txt -o $IP_FILE
+curl -s https://github.com/KevinGandalf/vpn-bypass/blob/main/bypass.txt -o $IP_FILE
 
 # 2. Vergleiche die neue Liste mit der vorherigen Liste
 #if [ -f $IP_FILE_PREVIOUS ]; then
