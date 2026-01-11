@@ -6,7 +6,6 @@ cd /opt
 git clone https://github.com/KevinGandalf/vpn-bypass
 cd vpn-bypass
 chmod +x vpn-bypass.sh
-Ggf. Gateway IP setzen
-nano /opt/vpn-bypass.sh
+Standard Gateway und Device werden automatisch erkannt.
 Script ausführen
 ./vpn-bypass.sh
